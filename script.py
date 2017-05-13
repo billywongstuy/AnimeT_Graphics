@@ -1,10 +1,13 @@
-import mdl
+import mdl, os
 from display import *
 from matrix import *
 from draw import *
 
+basename_set = False
+basename = 'simple'
+frames_set = False
+frames = None
 
-symbol_table = {}
 
 """======== first_pass( commands, symbols ) ==========
 
@@ -24,24 +27,28 @@ symbol_table = {}
   jdyrlandweaver
   ==================== """
 def first_pass( commands ):
-    frames_set = False
-    basename_set = False
+    global frames
+    global basename
+    global frames_set
+    global basename_set
     for command in commands:
         c = command[0]
         args = command[1:]
         
-        if c == 'vary' and not frames_set:
-            return
-        
         if c == 'frames':
+            frames = args[0]
             frames_set = True
-            symbol_table['frames'] = int(args[0])
+        
+        elif c == 'vary' and not frames_set:
+            return
+            
         elif c == 'basename':
-            symbol_table['basename'] = args[0]
+            basename = args[0]
+            basename_set = True
 
     if frames_set and not basename_set:
-        symbol_table['basename'] = 'simple'
-        print 'The file name is \"simple\"'
+        print 'Basename was not set. Basename is now \"simple\"'
+        
 
 
 """======== second_pass( commands ) ==========
@@ -61,21 +68,67 @@ def first_pass( commands ):
   dictionary corresponding to the given knob with the
   appropirate value. 
   ===================="""
+
+knobs = []
+
 def second_pass( commands, num_frames ):
+    global knobs
+    global frames_set
+    
+    if not frames_set:
+        return
 
-    #vary is checked here
+    knobs = [{} for x in range(num_frames)]
 
-    pass
+    for command in commands:
+        c = command[0]
+        args = command[1:]
 
+        if c == 'vary':
 
+            name = args[0]
+            start_frame  = int(args[1])
+            end_frame = int(args[2])
+            start_val = float(args[3])
+            end_val = float(args[4])
+
+            diff_frame = end_frame - start_frame
+
+            if diff_frame < 0:
+                print 'Invalid frame range specified'
+                return
+
+            diff_val = end_val - start_val
+            change_diff = diff_val / diff_frame
+            inc = 0.0
+            m = 1
+            
+            if change_diff < 0:
+                temp = start_frame
+                start_frame = end_frame
+                end_frame = temp
+                change_diff *= -1.0
+                m *= -1
+
+            for i in range(start_frame,end_frame+m,m):
+                knobs[i][name] = inc
+                inc += change_diff
+    
 def run(filename):
     """
     This function runs an mdl script
     """
+    global frames
+    global frames_set
+    global basename
+    global basename_set
+    global knobs
+    
     color = [255, 255, 255]
     tmp = new_matrix()
     ident( tmp )
-
+    screen = new_screen()
+    
     p = mdl.parseFile(filename)
 
     if p:
@@ -84,66 +137,99 @@ def run(filename):
         print "Parsing failed."
         return
 
-
     first_pass(commands)
-    
-    ident(tmp)
-    stack = [ [x[:] for x in tmp] ]
-    screen = new_screen()
-    tmp = []
-    step = 0.1
-    for command in commands:
-        print command
-        c = command[0]
-        args = command[1:]
+    second_pass(commands,frames)
 
-        #set methods
+    if not frames_set:
+        frames = 1
+    
+    for i in range(frames):
+        tmp = new_matrix()
+        ident(tmp)
+        stack = [ [x[:] for x in tmp] ]
         
-        if c == 'box':
-            add_box(tmp,
-                    args[0], args[1], args[2],
-                    args[3], args[4], args[5])
-            matrix_mult( stack[-1], tmp )
-            draw_polygons(tmp, screen, color)
-            tmp = []
-        elif c == 'sphere':
-            add_sphere(tmp,
-                       args[0], args[1], args[2], args[3], step)
-            matrix_mult( stack[-1], tmp )
-            draw_polygons(tmp, screen, color)
-            tmp = []
-        elif c == 'torus':
-            add_torus(tmp,
-                      args[0], args[1], args[2], args[3], args[4], step)
-            matrix_mult( stack[-1], tmp )
-            draw_polygons(tmp, screen, color)
-            tmp = []
-        elif c == 'move':
-            tmp = make_translate(args[0], args[1], args[2])
-            matrix_mult(stack[-1], tmp)
-            stack[-1] = [x[:] for x in tmp]
-            tmp = []
-        elif c == 'scale':
-            tmp = make_scale(args[0], args[1], args[2])
-            matrix_mult(stack[-1], tmp)
-            stack[-1] = [x[:] for x in tmp]
-            tmp = []
-        elif c == 'rotate':
-            theta = args[1] * (math.pi/180)
-            if args[0] == 'x':
-                tmp = make_rotX(theta)
-            elif args[0] == 'y':
-                tmp = make_rotY(theta)
-            else:
-                tmp = make_rotZ(theta)
-            matrix_mult( stack[-1], tmp )
-            stack[-1] = [ x[:] for x in tmp]
-            tmp = []
-        elif c == 'push':
-            stack.append([x[:] for x in stack[-1]] )
-        elif c == 'pop':
-            stack.pop()
-        elif c == 'display':
-            display(screen)
-        elif c == 'save':
-            save_extension(screen, args[0])
+        tmp = []
+        step = 0.1
+        for command in commands:
+            print command
+            c = command[0]
+            args = command[1:]
+            
+            if c == 'box':
+                add_box(tmp,
+                        args[0], args[1], args[2],
+                        args[3], args[4], args[5])
+                matrix_mult( stack[-1], tmp )
+                draw_polygons(tmp, screen, color)
+                tmp = []
+            elif c == 'sphere':
+                add_sphere(tmp,
+                           args[0], args[1], args[2], args[3], step)
+                matrix_mult( stack[-1], tmp )
+                draw_polygons(tmp, screen, color)
+                tmp = []
+            elif c == 'torus':
+                add_torus(tmp,
+                          args[0], args[1], args[2], args[3], args[4], step)
+                matrix_mult( stack[-1], tmp )
+                draw_polygons(tmp, screen, color)
+                tmp = []
+            elif c == 'move':
+                
+                if args[3] != None:
+                    a = knobs[i][args[3]] * args[0]
+                    b = knobs[i][args[3]] * args[1]
+                    c = knobs[i][args[3]] * args[2]
+                    args = (a,b,c,args[3])
+                
+                tmp = make_translate(args[0], args[1], args[2])
+                matrix_mult(stack[-1], tmp)
+                stack[-1] = [x[:] for x in tmp]
+                tmp = []
+            elif c == 'scale':
+                
+                if args[3] != None:
+                    a = knobs[i][args[3]] * args[0]
+                    b = knobs[i][args[3]] * args[1]
+                    c = knobs[i][args[3]] * args[2]
+                    args = (a,b,c,args[3])
+                
+                tmp = make_scale(args[0], args[1], args[2])
+                matrix_mult(stack[-1], tmp)
+                stack[-1] = [x[:] for x in tmp]
+                tmp = []
+            elif c == 'rotate':
+
+                if args[2] != None:
+                    a = knobs[i][args[2]] * args[1]
+                    args = (args[0],a,args[2])
+                
+                theta = args[1] * (math.pi/180)
+                if args[0] == 'x':
+                    tmp = make_rotX(theta)
+                elif args[0] == 'y':
+                    tmp = make_rotY(theta)
+                else:
+                    tmp = make_rotZ(theta)
+                matrix_mult( stack[-1], tmp )
+                stack[-1] = [ x[:] for x in tmp]
+                tmp = []
+                
+            elif c == 'push':
+                stack.append([x[:] for x in stack[-1]] )
+            elif c == 'pop':
+                stack.pop()
+            elif c == 'display':
+                display(screen)
+            elif c == 'save':
+                save_extension(screen, args[0])
+
+        name = 'anim/' + basename + (3-len(str(i)))*'0' + str(i) + '.ppm'
+
+        if not os.path.exists('anim'):
+            os.makedirs('anim')
+        
+        save_ppm(screen,name)
+        clear_screen(screen)
+
+    make_animation(basename)
