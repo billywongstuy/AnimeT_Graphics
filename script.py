@@ -114,10 +114,10 @@ def second_pass( commands, num_frames ):
                 temp = start_frame
                 start_frame = end_frame
                 end_frame = temp
-                change_diff *= -1.0
-                m *= -1
-                inc = end_val
-                end_val = start_val
+                change_diff *= -1.0 #make it positive
+                m *= -1 #go backwards in frames
+                inc = end_val #change the start
+                end_val = start_val  #change the end
                 
             for i in range(start_frame,end_frame+m,m):
                 knobs[i][name] = inc
@@ -142,6 +142,7 @@ def run(filename):
     tmp = new_matrix()
     ident( tmp )
     screen = new_screen()
+    step = 0.01
     
     p = mdl.parseFile(filename)
 
