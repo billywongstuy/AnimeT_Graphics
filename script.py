@@ -94,7 +94,7 @@ def second_pass( commands, num_frames ):
 
             diff_frame = end_frame - start_frame
 
-            if diff_frame < 0:
+            if diff_frame < 0 or start_frame < 0 or end_frame >= frames:
                 print 'Invalid frame range specified'
                 return
 
@@ -154,8 +154,16 @@ def run(filename):
             print command
             c = command[0]
             args = command[1:]
+
+            if c == 'set':
+                symbols[args[0]][1] = float(args[1]) 
+
+            elif c == 'setknobs':
+                for s in symbols:
+                    if symbols[s][0] == 'knob':
+                        symbols[s][1] = float(args[0])
             
-            if c == 'box':
+            elif c == 'box':
                 add_box(tmp,
                         args[0], args[1], args[2],
                         args[3], args[4], args[5])
@@ -233,3 +241,4 @@ def run(filename):
         clear_screen(screen)
 
     make_animation(basename)
+    print symbols
