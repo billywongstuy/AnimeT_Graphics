@@ -1,4 +1,6 @@
-import mdl, os
+#VARY BUT NO FRAMES DOES NOT WORK
+
+import mdl, os, sys
 from display import *
 from matrix import *
 from draw import *
@@ -31,6 +33,13 @@ def first_pass( commands ):
     global basename
     global frames_set
     global basename_set
+
+    cmds = [c[0] for c in commands]
+    
+    if 'vary' in cmds and not 'frames' in cmds:
+        print 'Frames was not set before calling vary!'
+        sys.exit()
+
     for command in commands:
         c = command[0]
         args = command[1:]
@@ -38,9 +47,6 @@ def first_pass( commands ):
         if c == 'frames':
             frames = args[0]
             frames_set = True
-        
-        elif c == 'vary' and not frames_set:
-            return
             
         elif c == 'basename':
             basename = args[0]
@@ -48,7 +54,8 @@ def first_pass( commands ):
 
     if frames_set and not basename_set:
         print 'Basename was not set. Basename is now \"simple\"'
-        
+
+    return frames
 
 
 """======== second_pass( commands ) ==========
@@ -100,7 +107,7 @@ def second_pass( commands, num_frames ):
 
             diff_val = end_val - start_val
             change_diff = diff_val / diff_frame
-            inc = 0.0
+            inc = start_val
             m = 1
             
             if change_diff < 0:
@@ -109,11 +116,18 @@ def second_pass( commands, num_frames ):
                 end_frame = temp
                 change_diff *= -1.0
                 m *= -1
-
+                inc = end_val
+                end_val = start_val
+                
             for i in range(start_frame,end_frame+m,m):
                 knobs[i][name] = inc
-                inc += change_diff
-    
+                
+                if inc < end_val:
+                    inc += change_diff
+                    
+                    
+    return knobs
+                
 def run(filename):
     """
     This function runs an mdl script
